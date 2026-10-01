@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K-Means Clustering Latent Space Inspector</title>
+    <style>
+        :root {
+            --bg-base: #0f111a;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-border-focus: rgba(99, 102, 241, 0.5);
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --accent: #06b6d4;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            background-image: 
+                radial-gradient(at 10% 20%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+                radial-gradient(at 90% 80%, rgba(6, 182, 212, 0.1) 0px, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 2rem;
+            border-bottom: 1px solid var(--glass-border);
+            background: rgba(15, 17, 26, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: -0.025em;
+            background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .shortcut-badge {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            backdrop-filter: blur(8px);
+        }
+
+        .shortcut-badge kbd {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 0.1rem 0.3rem;
+            border-radius: 4px;
+            color: var(--text-main);
+            font-family: monospace;
+        }
+
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: border-color 0.2s ease;
+        }
+
+        .card:focus-within {
+            border-color: var(--glass-border-focus);
+            outline: none;
+        }
+
+        .control-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--text-muted);
+        }
+
+        .control-group label span {
+            color: var(--text-main);
+            font-family: monospace;
+        }
+
+        input[type="range"], select {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            padding: 0.5rem;
+            color: var(--text-main);
+            outline: none;
+        }
+
+        input[type="range"] {
+            padding: 0;
+            height: 6px;
+            appearance: none;
+            border-radius: 3px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .btn-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+
+        button {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        button.primary {
+            background: var(--primary);
+            border-color: transparent;
+        }
+
+        button.primary:hover {
+            background: var(--primary-hover);
+        }
+
+        button:focus-visible {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+            outline: none;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .metric-box {
+            background: rgba(0, 0, 0, 0.15);
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.02);
+        }
+
+        .metric-box .label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .metric-box .value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            font-family: monospace;
+            margin-top: 0.25rem;
+            color: var(--accent);
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 500px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.02);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 1rem;
+            left: 1rem;
+            background: rgba(15, 17, 26, 0.8);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--glass-border);
+            padding: 0.5rem 0.75rem;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+            pointer-events: none;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .legend-color {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: rgba(15, 17, 26, 0.9);
+            border: 1px solid var(--glass-border-focus);
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(12px);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="brand">
+            <h1>LatentInspector // K-Means Engine</h1>
+            <p>Interactive Unsupervised Learning & Voronoi Space Partitioning</p>
+        </div>
+        <div class="shortcut-badge">
+            Focus: <kbd>/</kbd> | Step: <kbd>Space</kbd> | Reset: <kbd>R</kbd> | Gen: <kbd>G</kbd>
+        </div>
+    </header>
+
+    <main>
+        <section class="card" tabindex="0" id="controls-panel">
+            <div class="control-group">
+                <label for="k-slider">Clusters (K) <span id="k-val">4</span></label>
+                <input type="range" id="k-slider" min="2" max="8" value="4">
+            </div>
+
+            <div class="control-group">
+                <label for="points-slider">Sample Points <span id="points-val">300</span></label>
+                <input type="range" id="points-slider" min="50" max="1000" step="50" value="300">
+            </div>
+
+            <div class="control-group">
+                <label for="dist-select">Distribution Geometry</label>
+                <select id="dist-select">
+                    <option value="blobs">Multivariate Blobs</option>
+                    <option value="rings">Concentric Rings</option>
+                    <option value="moons">Interlocking Moons</option>
+                    <option value="uniform">Uniform Noise</option>
+                </select>
+            </div>
+
+            <div class="btn-grid">
+                <button id="btn-step" class="primary" title="Shortcut: Space">Step <kbd style="background:rgba(0,0,0,0.3);padding:1px 4px;border-radius:3px;">Space</kbd></button>
+                <button id="btn-run" title="Shortcut: Enter">Auto Run</button>
+                <button id="btn-generate" title="Shortcut: G">Resample <kbd style="background:rgba(0,0,0,0.3);padding:1px 4px;border-radius:3px;">G</kbd></button>
+                <button id="btn-reset" title="Shortcut: R">Reset <kbd style="background:rgba(0,0,0,0.3);padding:1px 4px;border-radius:3px;">R</kbd></button>
+            </div>
+
+            <div class="metrics-grid">
+                <div class="metric-box">
+                    <div class="label">Iteration</div>
+                    <div class="value" id="metric-iter">0</div>
+                </div>
+                <div class="metric-box">
+                    <div class="label">Inertia (WCSS)</div>
+                    <div class="value" id="metric-inertia">0.00</div>
+                </div>
+                <div class="metric-box" style="grid-column: span 2; margin-top: 0.5rem;">
+                    <div class="label">Convergence Status</div>
+                    <div class="value" id="metric-status" style="font-size: 0.9rem;">Awaiting Initialization</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="card" style="padding: 0.75rem; display: flex; flex-direction: column;">
+            <div class="canvas-container">
+                <canvas id="sim-canvas"></canvas>
+                <div class="legend" id="cluster-legend">
+                    <div class="legend-item">Click canvas to drop manual points</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div class="toast" id="toast-msg">Action Notification</div>
+
+    <script>
+        const PALETTE = [
+            '#6366f1', '#06b6d4', '#10b981', '#f59e0b',
+            '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'
+        ];
+
+        class KMeansEngine {
+            constructor() {
+                this.canvas = document.getElementById('sim-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.points = [];
+                this.centroids = [];
+                this.assignments = [];
+                this.k = 4;
+                this.numPoints = 300;
+                this.distribution = 'blobs';
+                this.iteration = 0;
+                this.inertia = 0;
+                this.converged = false;
+                this.isRunning = false;
+                this.runInterval = null;
+
+                this.initCanvasSize();
+                this.bindEvents();
+                this.generateData();
+                this.initCentroids();
+                this.render();
+            }
+
+            initCanvasSize() {
+                const rect = this.canvas.parentElement.getBoundingClientRect();
+                this.canvas.width = rect.width;
+                this.canvas.height = rect.height;
+                window.addEventListener('resize', () => {
+                    const r = this.canvas.parentElement.getBoundingClientRect();
+                    this.canvas.width = r.width;
+                    this.canvas.height = r.height;
+                    this.render();
+                });
+            }
+
+            generateData() {
+                this.points = [];
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+
+                if (this.distribution === 'blobs') {
+                    const centers = [
+                        {x: w * 0.3, y: h * 0.3}, {x: w * 0.7, y: h * 0.3},
+                        {x: w * 0.3, y: h * 0.7}, {x: w * 0.7, y: h * 0.7}
+                    ];
+                    for (let i = 0; i < this.numPoints; i++) {
+                        const center = centers[Math.floor(Math.random() * centers.length)];
+                        this.points.push({
+                            x: center.x + (Math.random() - 0.5) * (w * 0.2),
+                            y: center.y + (Math.random() - 0.5) * (h * 0.2)
+                        });
+                    }
+                } else if (this.distribution === 'rings') {
+                    for (let i = 0; i < this.numPoints; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const r = i < this.numPoints / 2 ? Math.min(w,h) * 0.15 + (Math.random()-0.5)*20 : Math.min(w,h) * 0.35 + (Math.random()-0.5)*30;
+                        this.points.push({
+                            x: w / 2 + Math.cos(angle) * r,
+                            y: h / 2 + Math.sin(angle) * r
+                        });
+                    }
+                } else if (this.distribution === 'moons') {
+                    for (let i = 0; i < this.numPoints; i++) {
+                        const isMoon2 = i >= this.numPoints / 2;
+                        const theta = Math.random() * Math.PI;
+                        let x = w * 0.4 + (isMoon2 ? w * 0.2 : 0) + Math.cos(theta) * (w * 0.25);
+                        let y = h * 0.5 + (isMoon2 ? h * 0.15 : -h * 0.15) + Math.sin(theta) * (h * 0.25) * (isMoon2 ? -1 : 1);
+                        this.points.push({
+                            x: x + (Math.random() - 0.5) * 15,
+                            y: y + (Math.random() - 0.5) * 15
+                        });
+                    }
+                } else {
+                    for (let i = 0; i < this.numPoints; i++) {
+                        this.points.push({
+                            x: Math.random() * (w - 40) + 20,
+                            y: Math.random() * (h - 40) + 20
+                        });
+                    }
+                }
+                this.resetState();
+            }
+
+            resetState() {
+                this.stopRun();
+                this.iteration = 0;
+                this.converged = false;
+                this.initCentroids();
+                this.assignments = new Array(this.points.length).fill(-1);
+                this.calculateInertia();
+                this.updateMetrics();
+                this.render();
+                showToast('Latent space reset & re-initialized');
+            }
+
+            initCentroids() {
+                this.centroids = [];
+                // Forgy initialization: pick K random points
+                const shuffled = [...this.points].sort(() => 0.5 - Math.random());
+                for (let i = 0; i < this.k; i++) {
+                    if (shuffled[i]) {
+                        this.centroids.push({ x: shuffled[i].x, y: shuffled[i].y });
+                    } else {
+                        this.centroids.push({
+                            x: Math.random() * this.canvas.width,
+                            y: Math.random() * this.canvas.height
+                        });
+                    }
+                }
+            }
+
+            step() {
+                if (this.converged || this.points.length === 0) return false;
+
+                // 1. Assignment step
+                let changed = false;
+                const newAssignments = this.points.map(p => {
+                    let minDist = Infinity;
+                    let bestCluster = 0;
+                    this.centroids.forEach((c, idx) => {
+                        const dist = Math.hypot(p.x - c.x, p.y - c.y);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            bestCluster = idx;
+                        }
+                    });
+                    return bestCluster;
+                });
+
+                if (JSON.stringify(newAssignments) !== JSON.stringify(this.assignments)) {
+                    changed = true;
+                }
+                this.assignments = newAssignments;
+
+                // 2. Update step
+                const sums = Array.from({ length: this.k }, () => ({ x: 0, y: 0, count: 0 }));
+                this.points.forEach((p, idx) => {
+                    const cluster = this.assignments[idx];
+                    sums[cluster].x += p.x;
+                    sums[cluster].y += p.y;
+                    sums[cluster].count++;
+                });
+
+                let maxShift = 0;
+                this.centroids = this.centroids.map((c, idx) => {
+                    if (sums[idx].count === 0) return c; // Empty cluster guard
+                    const newX = sums[idx].x / sums[idx].count;
+                    const newY = sums[idx].y / sums[idx].count;
+                    maxShift = Math.max(maxShift, Math.hypot(newX - c.x, newY - c.y));
+                    return { x: newX, y: newY };
+                });
+
+                this.iteration++;
+                this.calculateInertia();
+                this.updateMetrics();
+                this.render();
+
+                if (!changed || maxShift < 0.1 || this.iteration > 100) {
+                    this.converged = true;
+                    this.stopRun();
+                    document.getElementById('metric-status').textContent = 'Converged Successfully';
+                    document.getElementById('metric-status').style.color = '#10b981';
+                    showToast('Convergence criteria achieved');
+                    return false;
+                }
+                return true;
+            }
+
+            calculateInertia() {
+                let sum = 0;
+                this.points.forEach((p, idx) => {
+                    const cluster = this.assignments[idx];
+                    if (cluster !== -1 && this.centroids[cluster]) {
+                        const dist = Math.hypot(p.x - this.centroids[cluster].x, p.y - this.centroids[cluster].y);
+                        sum += dist * dist;
+                    }
+                });
+                this.inertia = sum;
+            }
+
+            updateMetrics() {
+                document.getElementById('metric-iter').textContent = this.iteration;
+                document.getElementById('metric-inertia').textContent = this.inertia.toFixed(2);
+                if (!this.converged && this.iteration > 0) {
+                    document.getElementById('metric-status').textContent = 'Iterating (Expectation-Maximization)';
+                    document.getElementById('metric-status').style.color = 'var(--accent)';
+                }
+            }
+
+            toggleRun() {
+                if (this.isRunning) {
+                    this.stopRun();
+                } else {
+                    if (this.converged) this.resetState();
+                    this.isRunning = true;
+                    document.getElementById('btn-run').textContent = 'Pause Run';
+                    document.getElementById('btn-run').style.borderColor = 'var(--primary)';
+                    this.runInterval = setInterval(() => {
+                        const active = this.step();
+                        if (!active) this.stopRun();
+                    }, 150);
+                }
+            }
+
+            stopRun() {
+                this.isRunning = false;
+                clearInterval(this.runInterval);
+                const runBtn = document.getElementById('btn-run');
+                if (runBtn) {
+                    runBtn.textContent = 'Auto Run';
+                    runBtn.style.borderColor = '';
+                }
+            }
+
+            render() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+                this.ctx.clearRect(0, 0, w, h);
+
+                // Draw Voronoi approximation cells
+                if (this.centroids.length > 0 && w > 0 && h > 0) {
+                    const stepSize = 12;
+                    for (let x = 0; x < w; x += stepSize) {
+                        for (let y = 0; y < h; y += stepSize) {
+                            let minDist = Infinity;
+                            let closestCentroid = 0;
+                            this.centroids.forEach((c, idx) => {
+                                const d = Math.hypot(x - c.x, y - c.y);
+                                if (d < minDist) {
+                                    minDist = d;
+                                    closestCentroid = idx;
+                                });
+                            });
+                            this.ctx.fillStyle = PALETTE[closestCentroid % PALETTE.length];
+                            this.ctx.globalAlpha = 0.06;
+                            this.ctx.fillRect(x, y, stepSize, stepSize);
+                        }
+                    }
+                    this.ctx.globalAlpha = 1.0;
+                }
+
+                // Draw points
+                this.points.forEach((p, idx) => {
+                    const cluster = this.assignments[idx];
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                    this.ctx.fillStyle = cluster === -1 ? '#94a3b8' : PALETTE[cluster % PALETTE.length];
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+                    this.ctx.lineWidth = 1;
+                    this.ctx.stroke();
+                });
+
+                // Draw centroids
+                this.centroids.forEach((c, idx) => {
+                    this.ctx.beginPath();
+                    this.ctx.arc(c.x, c.y, 10, 0, Math.PI * 2);
+                    this.ctx.fillStyle = PALETTE[idx % PALETTE.length];
+                    this.ctx.fill();
+                    this.ctx.strokeStyle = '#ffffff';
+                    this.ctx.lineWidth = 2.5;
+                    this.ctx.stroke();
+
+                    // Centroid crosshair
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(c.x - 4, c.y);
+                    this.ctx.lineTo(c.x + 4, c.y);
+                    this.ctx.moveTo(c.x, c.y - 4);
+                    this.ctx.lineTo(c.x, c.y + 4);
+                    this.ctx.strokeStyle = '#0f111a';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.stroke();
+                });
+
+                this.updateLegend();
+            }
+
+            updateLegend() {
+                const legend = document.getElementById('cluster-legend');
+                let html = '';
+                for (let i = 0; i < this.k; i++) {
+                    const count = this.assignments.filter(a => a === i).length;
+                    html += `
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: ${PALETTE[i % PALETTE.length]}"></div>
+                            <span>Cluster ${i+1}: <strong>${count}</strong> pts</span>
+                        </div>
+                    `;
+                }
+                legend.innerHTML = html;
+            }
+
+            bindEvents() {
+                document.getElementById('k-slider').addEventListener('input', (e) => {
+                    this.k = parseInt(e.target.value);
+                    document.getElementById('k-val').textContent = this.k;
+                    this.resetState();
+                });
+
+                document.getElementById('points-slider').addEventListener('input', (e) => {
+                    this.numPoints = parseInt(e.target.value);
+                    document.getElementById('points-val').textContent = this.numPoints;
+                    this.generateData();
+                });
+
+                document.getElementById('dist-select').addEventListener('change', (e) => {
+                    this.distribution = e.target.value;
+                    this.generateData();
+                });
+
+                document.getElementById('btn-step').addEventListener('click', () => this.step());
+                document.getElementById('btn-run').addEventListener('click', () => this.toggleRun());
+                document.getElementById('btn-generate').addEventListener('click', () => this.generateData());
+                document.getElementById('btn-reset').addEventListener('click', () => this.resetState());
+
+                this.canvas.addEventListener('click', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.points.push({
+                        x: e.clientX - rect.left,
+                        y: e.clientY - rect.top
+                    });
+                    this.assignments.push(-1);
+                    this.calculateInertia();
+                    this.render();
+                    showToast('Injected manual data point');
+                });
+            }
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast-msg');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        // Global Keyboard Shortcut Manager
+        const engine = new KMeansEngine();
+
+        window.addEventListener('keydown', (e) => {
+            // Prevent trigger if typing inside inputs
+            if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+                if (e.key === 'Escape') {
+                    document.activeElement.blur();
+                }
+                return;
+            }
+
+            if (e.key === '/') {
+                e.preventDefault();
+                document.getElementById('controls-panel').focus();
+                showToast('Focus: Control Panel');
+            } else if (e.code === 'Space') {
+                e.preventDefault();
+                engine.step();
+            } else if (e.key.toLowerCase() === 'r') {
+                e.preventDefault();
+                engine.resetState();
+            } else if (e.key.toLowerCase() === 'g') {
+                e.preventDefault();
+                engine.generateData();
+                showToast('Resampled latent space distribution');
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                engine.toggleRun();
+            }
+        });
+    </script>
+</body>
+</html>
